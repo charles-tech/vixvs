@@ -1,12 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import time
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import pandas as pd
-import numpy as np
-from sklearn.linear_model import LinearRegression
 
 def fetch_data(ticker, start_date, end_date, max_retries=3):
     for attempt in range(max_retries):
@@ -19,19 +14,17 @@ def fetch_data(ticker, start_date, end_date, max_retries=3):
         except Exception as e:
             if attempt == max_retries - 1:
                 raise
-            time.sleep(1)  # Wait before retrying
+            time.sleep(1)
 
-def ensure_date_in_index(data, date):
-    if date not in data.index:
-        st.warning(f"A data {date.strftime('%d/%m/%Y')} não está nos dados disponíveis.")
-    return data
+def adjust_end_date(data, end_date):
+    last_available_date = data.index.max()
+    if end_date > last_available_date:
+        end_date = last_available_date
+        st.warning(f"Ajustando a data de fim para a última data disponível: {end_date.strftime('%d/%m/%Y')}")
+    return end_date
 
-# Main UI Setup
 st.markdown("<h1 style='text-align: center;'>📈 Análise VIX vs Ativos</h1>", unsafe_allow_html=True)
-
-col1, col2 = st.columns([3,1])
-with col1:
-    ticker_input = st.text_input("Digite o ticker (ex: AAPL, PETR4.SA):", value='AAPL')
+ticker_input = st.text_input("Digite o ticker (ex: AAPL, PETR4.SA):", value='AAPL')
 
 end_date = pd.Timestamp.now()
 start_date = end_date - pd.DateOffset(months=24)
@@ -40,9 +33,9 @@ try:
     vix_data = fetch_data('^VIX', start_date, end_date)
     asset_data = fetch_data(ticker_input, start_date, end_date)
     
-    vix_data = ensure_date_in_index(vix_data, end_date)
-    asset_data = ensure_date_in_index(asset_data, end_date)
-    
+    end_date = adjust_end_date(vix_data, end_date)
+    end_date = adjust_end_date(asset_data, end_date)
+
     combined = pd.DataFrame({'VIX': vix_data, 'Ativo': asset_data}).dropna()
 
     if len(combined) < 50:
@@ -56,7 +49,7 @@ try:
         """)
         st.stop()
     
-    # Resto do código para visualizações e previsões...
+    # Continuar com a análise...
 
 except Exception as e:
     st.error(f"Erro: {str(e)}. Verifique o ticker e sua conexão.")
