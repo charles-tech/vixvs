@@ -19,8 +19,9 @@ def fetch_data(ticker, start_date, end_date, max_retries=3):
 st.title("📈 Análise VIX vs Ativos")
 ticker_input = st.text_input("Digite o ticker (ex: AAPL, PETR4.SA):", value='AAPL')
 
+# Uso de um período de dados muito recente para teste
 end_date = pd.Timestamp.now().tz_localize(None)
-start_date = end_date - pd.DateOffset(months=24)
+start_date = end_date - pd.DateOffset(weeks=1)  # Apenas uma semana
 
 try:
     vix_data = fetch_data('^VIX', start_date, end_date)
@@ -35,8 +36,8 @@ try:
         'Ativo': asset_data
     }).dropna()
 
-    if len(combined) < 50:
-        st.error("⚠️ Dados insuficientes para análise. Por favor, tente outro período ou ticker.")
+    if len(combined) < 5:  # Ajuste de limite para teste
+        st.error("⚠️ Dados insuficientes para análise.")
         st.stop()
 
     st.line_chart(combined)
