@@ -26,7 +26,12 @@ def ensure_date_in_index(data, date):
         st.warning(f"A data {date.strftime('%d/%m/%Y')} não está nos dados disponíveis.")
     return data
 
-# Simplified UI code with added checks
+# Main UI Setup
+st.markdown("<h1 style='text-align: center;'>📈 Análise VIX vs Ativos</h1>", unsafe_allow_html=True)
+
+col1, col2 = st.columns([3,1])
+with col1:
+    ticker_input = st.text_input("Digite o ticker (ex: AAPL, PETR4.SA):", value='AAPL')
 
 end_date = pd.Timestamp.now()
 start_date = end_date - pd.DateOffset(months=24)
