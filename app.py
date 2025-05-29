@@ -176,8 +176,11 @@ with col1:
 with col2:
     st.markdown("<div style='height: 38px; display: flex; align-items: center; justify-content: center;'>🔍</div>", unsafe_allow_html=True)
 
-end_date = pd.Timestamp.now()
-start_date = end_date - pd.DateOffset(months=24)  # Increased to 2 years for more data points
+# Get most recent common date with available data
+end_date_vix = pd.Timestamp.now() - pd.DateOffset(days=1)
+end_date_asset = pd.Timestamp.now() - pd.DateOffset(days=2)
+end_date = min(end_date_vix, end_date_asset)
+start_date = end_date - pd.DateOffset(months=24)  # 2 years of data
 
 try:
     print(f"Fetching VIX data from {start_date} to {end_date}")  # Debug
