@@ -16,23 +16,28 @@ def fetch_data(ticker, start_date, end_date, max_retries=3):
                 raise
             time.sleep(1)
 
-def ensure_tz_naive(date):
-    return date.tz_localize(None)
+def ensure_tz_naive(data):
+    data.index = data.index.tz_localize(None)
+    return data
 
 st.markdown("<h1 style='text-align: center;'>📈 Análise VIX vs Ativos</h1>", unsafe_allow_html=True)
 ticker_input = st.text_input("Digite o ticker (ex: AAPL, PETR4.SA):", value='AAPL')
 
-end_date = pd.Timestamp.now().tz_localize(None)
+end_date = pd.Timestamp.now().tz_localize(None)  # Ensure tz-naive
 start_date = end_date - pd.DateOffset(months=24)
 
 try:
     vix_data = fetch_data('^VIX', start_date, end_date)
     asset_data = fetch_data(ticker_input, start_date, end_date)
     
-    last_vix_date = ensure_tz_naive(vix_data.index.max())
-    last_asset_date = ensure_tz_naive(asset_data.index.max())
+    # Ensure both datasets are tz-naive
+    vix_data = ensure_tz_naive(vix_data)
+    asset_data = ensure_tz_naive(asset_data)
 
-    # Ajuste as datas finais para aquelas disponíveis
+    last_vix_date = vix_data.index.max()
+    last_asset_date = asset_data.index.max()
+
+    # Define datas finais disponíveis
     end_date_vix = min(end_date, last_vix_date)
     end_date_asset = min(end_date, last_asset_date)
 
