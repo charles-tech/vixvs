@@ -176,11 +176,46 @@ with col1:
 with col2:
     st.markdown("<div style='height: 38px; display: flex; align-items: center; justify-content: center;'>🔍</div>", unsafe_allow_html=True)
 
-# Get most recent common date with available data
-end_date_vix = pd.Timestamp.now() - pd.DateOffset(days=1)
-end_date_asset = pd.Timestamp.now() - pd.DateOffset(days=2)
-end_date = min(end_date_vix, end_date_asset)
-start_date = end_date - pd.DateOffset(months=24)  # 2 years of data
+# Try to get current day data, fallback to last available
+def get_latest_data(ticker):
+    try:
+        # First try current day
+        current_date = pd.Timestamp.now().normalize()
+        data = yf.Ticker(ticker).history(start=current_date, end=current_date + pd.DateOffset(days=1))
+        if not data.empty:
+            return data['Close'], current_date
+        
+        # If no current day data, try previous days
+        for days_back in range(1, 4):  # Try up to 3 days back
+            try_date = current_date - pd.DateOffset(days=days_back)
+            data = yf.Ticker(ticker).history(start=try_date, end=try_date + pd.DateOffset(days=1))
+            if not data.empty:
+                return data['Close'], try_date
+        raise ValueError("No recent data available")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch latest data: {str(e)}")
+
+# Get historical data for analysis
+start_date = pd.Timestamp.now() - pd.DateOffset(months=24)  # 2 years of data
+end_date = pd.Timestamp.now() - pd.DateOffset(days=1)  # Yesterday for historical
+
+# Get latest point separately
+try:
+    vix_latest, vix_date = get_latest_data('^VIX')
+    asset_latest, asset_date = get_latest_data(ticker_input)
+    
+    # Show warning if not current day
+    if vix_date.date() != pd.Timestamp.now().date():
+        st.warning(f"⚠️ Dados mais recentes do VIX: {vix_date.strftime('%d/%m/%Y')} (não há dados para hoje ainda)")
+    if asset_date.date() != pd.Timestamp.now().date():
+        st.warning(f"⚠️ Dados mais recentes de {ticker_input}: {asset_date.strftime('%d/%m/%Y')} (não há dados para hoje ainda)")
+except Exception as e:
+    st.warning(f"Não foi possível obter dados recentes: {str(e)}")
+    # Fallback to historical data
+    vix_date = end_date
+    asset_date = end_date
+    vix_latest = None
+    asset_latest = None
 
 try:
     print(f"Fetching VIX data from {start_date} to {end_date}")  # Debug
@@ -206,11 +241,19 @@ try:
     vix_aligned = vix_data.reindex(all_dates).ffill()
     asset_aligned = asset_data.reindex(all_dates).ffill()
     
-    # Combine aligned data
+    # Combine aligned data with latest point if available
     combined = pd.DataFrame({
         'VIX': vix_aligned,
         'Ativo': asset_aligned
     }).dropna()
+    
+    # Add latest point if available
+    if vix_latest is not None and asset_latest is not None:
+        latest_point = pd.DataFrame({
+            'VIX': [vix_latest.iloc[-1]],
+            'Ativo': [asset_latest.iloc[-1]]
+        }, index=[vix_date])
+        combined = pd.concat([combined, latest_point])
     
     if len(combined) < 50:
         st.error(f"""
@@ -244,10 +287,10 @@ try:
                 </div>
                 <div style="font-size: 1rem; font-weight: 500; color: #5f6368;">VIX ATUAL</div>
             </div>
-            <div style="font-size: 2.25rem; font-weight: 700; color: #202124; margin: 8px 0;">${vix_data.iloc[-1]:.2f}</div>
+            <div style="font-size: 2.25rem; font-weight: 700; color: #202124; margin: 8px 0;">${vix_latest.iloc[-1] if vix_latest is not None else vix_data.iloc[-1]:.2f}</div>
             <div style="display: flex; align-items: center; gap: 4px; color: #5f6368; font-size: 0.875rem;">
                 <span class="material-icons" style="font-size: 16px;">event</span>
-                {vix_data.index[-1].strftime('%d/%m/%Y')}
+                {vix_date.strftime('%d/%m/%Y')}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -261,10 +304,10 @@ try:
                 </div>
                 <div style="font-size: 1rem; font-weight: 500; color: #5f6368;">{ticker_input.upper()}</div>
             </div>
-            <div style="font-size: 2.25rem; font-weight: 700; color: #202124; margin: 8px 0;">${asset_data.iloc[-1]:.2f}</div>
+            <div style="font-size: 2.25rem; font-weight: 700; color: #202124; margin: 8px 0;">${asset_latest.iloc[-1] if asset_latest is not None else asset_data.iloc[-1]:.2f}</div>
             <div style="display: flex; align-items: center; gap: 4px; color: #5f6368; font-size: 0.875rem;">
                 <span class="material-icons" style="font-size: 16px;">event</span>
-                {asset_data.index[-1].strftime('%d/%m/%Y')}
+                {asset_date.strftime('%d/%m/%Y')}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -319,8 +362,9 @@ try:
     )
     
     # Add current value indicators
+    latest_date = vix_date if vix_latest is not None else combined.index[-1]
     fig.add_vline(
-        x=combined.index[-1],
+        x=latest_date,
         line_width=1,
         line_dash='dash',
         line_color='grey'
